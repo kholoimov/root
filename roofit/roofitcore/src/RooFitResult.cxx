@@ -53,7 +53,7 @@
 #include "TMatrixDSym.h"
 #include "RooMultiVarGaussian.h"
 
-
+#include "TString.h"
 using std::cout, std::endl, std::ostream, std::string, std::pair, std::vector, std::setw;
 
 ClassImp(RooFitResult);
@@ -401,7 +401,6 @@ double RooFitResult::correlation(const char* parname1, const char* parname2) con
   }
   return correlation(idx1,idx2) ;
 }
-
 
 
 ////////////////////////////////////////////////////////////////////////////////

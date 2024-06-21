@@ -252,6 +252,301 @@ void RooStats::HistFactory::Measurement::PrintTree( std::ostream& stream )
 
 }
 
+void RooStats::HistFactory::Measurement::PrintHistogramToJson(std::ofstream& jsonFile, const TH1* histogram, int indent)
+{
+  for (int i = 0; i < histogram->GetNbinsX(); ++i) {
+    // jsonFile << "\t\t\t\t\t\t"
+    for (int j = 0; j < indent; ++j) {
+      jsonFile << "\t";
+    }
+    jsonFile << histogram->GetBinContent(i + 1);
+    if (i < histogram->GetNbinsX() - 1) {
+      jsonFile << ",";
+    }
+    jsonFile << std::endl;
+  }
+}
+
+TH1* RooStats::HistFactory::Measurement::MakeAbsolUncertaintyHist(const TH1* nominal, std::string name)
+{
+
+    // Take a nominal TH1* and create
+    // a TH1 representing the binwise
+    // errors (taken from the nominal TH1)
+
+    auto ErrorHist = static_cast<TH1*>(nominal->Clone( name.c_str() ));
+    ErrorHist->Reset();
+
+    int numBins   = nominal->GetNbinsX()*nominal->GetNbinsY()*nominal->GetNbinsZ();
+    int binNumber = 0;
+
+    // Loop over bins
+    for( int i_bin = 0; i_bin < numBins; ++i_bin) {
+
+      binNumber++;
+      // Ignore underflow / overflow
+      while( nominal->IsBinUnderflow(binNumber) || nominal->IsBinOverflow(binNumber) ){
+   binNumber++;
+      }
+
+      double histError = nominal->GetBinError( binNumber );
+
+      // Check that histError != NAN
+      if( histError != histError ) {
+   std::cout << "Warning: In histogram " << nominal->GetName()
+        << " bin error for bin " << i_bin
+        << " is NAN.  Not using Error!!!"
+        << std::endl;
+   throw hf_exc();
+   //histError = sqrt( histContent );
+   //histError = 0;
+      }
+
+      // Check that histError ! < 0
+      if( histError < 0  ) {
+   std::cout << "Warning: In histogram " << nominal->GetName()
+        << " bin error for bin " << binNumber
+        << " is < 0.  Setting Error to 0"
+        << std::endl;
+   //histError = sqrt( histContent );
+   histError = 0;
+      }
+
+      ErrorHist->SetBinContent( binNumber, histError );
+
+    }
+
+    return ErrorHist;
+}
+
+void RooStats::HistFactory::Measurement::PrintObservationToJson(std::ofstream& jsonFile, RooStats::HistFactory::Channel& observation) // TODO: add possibility to print UserDefinedStatError
+{
+  jsonFile << "\t\t{" << std::endl;
+  jsonFile << "\t\t\t\"data\": [" << std::endl;
+  const TH1* histogram = observation.GetData().GetHisto();
+  PrintHistogramToJson(jsonFile, histogram, 4);
+  jsonFile << "\t\t\t]," << std::endl;
+  jsonFile << "\t\t\t\"name\": \"" << observation.GetName() << "\"" << std::endl;
+  jsonFile << "\t\t}" << std::endl;
+}
+
+void RooStats::HistFactory::Measurement::PrintStatErrorToJson(std::ofstream& jsonFile, RooStats::HistFactory::Sample& sample)
+{
+  jsonFile << "\t\t\t\t\t\t{" << std::endl;
+  jsonFile << "\t\t\t\t\t\t\t\"data\": [" << std::endl;
+  TH1* statError = MakeAbsolUncertaintyHist(sample.GetHisto(), "staterror_" + sample.GetName());
+  PrintHistogramToJson(jsonFile, statError, 8);
+  jsonFile << "\t\t\t\t\t\t\t]," << std::endl;
+  jsonFile << "\t\t\t\t\t\t\t\"name\": \"" << "staterror_" <<sample.GetName() << "\"," << std::endl;
+  jsonFile << "\t\t\t\t\t\t\t\"type\": \"staterror\"" << std::endl;
+  jsonFile << "\t\t\t\t\t\t}";
+}
+
+void RooStats::HistFactory::Measurement::PrintSystematicsToJson(std::ofstream& jsonFile, RooStats::HistFactory::Sample& sample)
+{
+  for (int i = 0; i < sample.GetOverallSysList().size(); ++i) {
+    jsonFile << "\t\t\t\t\t\t{" << std::endl;
+    jsonFile << "\t\t\t\t\t\t\t\"data\": ";
+    if (std::isnan(sample.GetOverallSysList().at(i).GetHigh())) jsonFile << "null," << std::endl;
+    else 
+    {
+      jsonFile << "{" << std::endl << "\t\t\t\t\t\t\t\t\"hi\": " << sample.GetOverallSysList().at(i).GetHigh() << "," << std::endl;
+      jsonFile << "\t\t\t\t\t\t\t\t\"lo\": " << sample.GetOverallSysList().at(i).GetLow() << std::endl << "\t\t\t\t\t\t\t}," << std::endl;
+    }
+    jsonFile << "\t\t\t\t\t\t\t\"name\": \"" << sample.GetOverallSysList().at(i).GetName() << "\"," << std::endl;
+    jsonFile << "\t\t\t\t\t\t\t\"type\": \"normsys\"" << std::endl;
+    jsonFile << "\t\t\t\t\t\t}";
+    if (i < sample.GetOverallSysList().size() - 1) {
+      jsonFile << ",";
+    }
+    jsonFile << std::endl;
+  }
+
+  if (sample.GetNormFactorList().size() > 0) {
+    jsonFile << ",";
+  }
+
+  for (int i = 0; i < sample.GetNormFactorList().size(); ++i) {
+    jsonFile << "\t\t\t\t\t\t{" << std::endl;
+    jsonFile << "\t\t\t\t\t\t\t\"data\": ";
+    jsonFile << "null," << std::endl;
+    // if (std::isnan(sample.GetNormFactorList().at(i).GetHigh())) jsonFile << "null," << std::endl;
+    // else 
+    // {
+    //   jsonFile << "{" << std::endl << "\t\t\t\t\t\t\t\t\"hi\": " << sample.GetNormFactorList().at(i).GetHigh() << "," << std::endl;
+    //   jsonFile << "\t\t\t\t\t\t\t\t\"lo\": " << sample.GetNormFactorList().at(i).GetLow() << std::endl << "\t\t\t\t\t\t\t}," << std::endl;
+    // }
+    jsonFile << "\t\t\t\t\t\t\t\"name\": \"" << sample.GetNormFactorList().at(i).GetName() << "\"," << std::endl;
+    jsonFile << "\t\t\t\t\t\t\t\"type\": \"normfactor\"" << std::endl;
+    jsonFile << "\t\t\t\t\t\t}";
+    if (i < sample.GetNormFactorList().size() - 1) {
+      jsonFile << ",";
+    }
+    jsonFile << std::endl;
+  }
+
+  if (sample.GetHistoSysList().size() > 0) {
+    jsonFile << ",";
+  }
+
+  for (int i = 0; i < sample.GetHistoSysList().size(); i++)
+  {
+    jsonFile << "\t\t\t\t\t\t{" << std::endl;
+    jsonFile << "\t\t\t\t\t\t\t\"data\": {" << std::endl;
+    jsonFile << "\t\t\t\t\t\t\t\t\"hi_data\": [" << std::endl;
+    const TH1* histogram = sample.GetHistoSysList().at(i).GetHistoHigh();
+    PrintHistogramToJson(jsonFile, histogram, 8);
+    jsonFile << "\t\t\t\t\t\t\t]," << std::endl;
+    jsonFile << "\t\t\t\t\t\t\t\t\"lo_data\": [" << std::endl;
+    const TH1* histogram_low = sample.GetHistoSysList().at(i).GetHistoLow();
+    PrintHistogramToJson(jsonFile, histogram_low, 8);
+    jsonFile << "\t\t\t\t\t\t\t]" << std::endl; 
+    jsonFile << "\t\t\t\t\t\t\t}," << std::endl;
+    jsonFile << "\t\t\t\t\t\t\t\"name\": \"" << sample.GetHistoSysList().at(i).GetName() << "\"," << std::endl;
+    jsonFile << "\t\t\t\t\t\t\t\"type\": \"histosys\"" << std::endl;
+    jsonFile << "\t\t\t\t\t\t}";
+    if (i < sample.GetHistoSysList().size() - 1) {
+      jsonFile << "," << std::endl;
+    }
+  }
+
+  if (sample.HasStatError() && true)  { // TODO: fix
+    jsonFile << "," << std::endl;
+    PrintStatErrorToJson(jsonFile, sample);
+  }
+
+  jsonFile << std::endl;
+
+
+}
+
+void RooStats::HistFactory::Measurement::PrintSampleToJson(std::ofstream& jsonFile, RooStats::HistFactory::Sample& sample)
+{
+  jsonFile << "\t\t\t\t{" << std::endl;
+  jsonFile << "\t\t\t\t\t\"data\": [" << std::endl;
+  const TH1* histogram = sample.GetHisto();
+  PrintHistogramToJson(jsonFile, histogram, 6);
+  jsonFile << "\t\t\t\t\t]," << std::endl;
+  jsonFile << "\t\t\t\t\t\"modifiers\": [" << std::endl;
+  PrintSystematicsToJson(jsonFile, sample);
+  jsonFile << "\t\t\t\t\t]," << std::endl;
+  jsonFile << "\t\t\t\t\t\"name\": \"" << sample.GetName() << "\"" << std::endl;
+  jsonFile << "\t\t\t\t}";
+}
+
+void RooStats::HistFactory::Measurement::PrintChannelToJson(std::ofstream& jsonFile, RooStats::HistFactory::Channel& channel)
+{
+  jsonFile << "\t\t{" << std::endl;
+  jsonFile << "\t\t\t\"name\": \"" << channel.GetName() << "\"," << std::endl;
+  jsonFile << "\t\t\t\"samples\": [" << std::endl;
+  for (unsigned int i = 0; i < channel.GetSamples().size(); ++i) {
+    PrintSampleToJson(jsonFile, channel.GetSamples().at(i));
+    if (i < channel.GetSamples().size() - 1) {
+      jsonFile << ",";
+    }
+    jsonFile << std::endl;
+  }
+  jsonFile << "\t\t\t]" << std::endl;
+  jsonFile << "\t\t}" << std::endl;
+
+}
+
+void RooStats::HistFactory::Measurement::PrintMeasurementToJson(std::ofstream& jsonFile, RooStats::HistFactory::Measurement& measurement)
+{
+  bool non_first_param = false;
+  jsonFile << "\t\"measurements\": [" << std::endl;
+  jsonFile << "\t\t{" << std::endl;
+  jsonFile << "\t\t\t\"config\": {" << std::endl;
+  jsonFile << "\t\t\t\t\"parameters\": [" << std::endl;
+    for (unsigned int i = 0; i < fChannels.size(); ++i) {
+      for (unsigned int j = 0; j < fChannels.at(i).GetSamples().size(); ++j) {
+        auto sample = fChannels.at(i).GetSamples().at(j);
+        for (unsigned int k = 0; k < sample.GetNormFactorList().size(); ++k) {
+          if (non_first_param) {
+            jsonFile << "," << std::endl;
+          }
+          non_first_param = true;
+          jsonFile << "\t\t\t\t\t\t{" << std::endl << "\t\t\t\t\t\t\t\"bounds\": [" << std::endl;
+          jsonFile << "\t\t\t\t\t\t\t\t[" << std::endl << "\t\t\t\t\t\t\t\t\t" << sample.GetNormFactorList().at(k).GetLow() << "," << std::endl << "\t\t\t\t\t\t\t\t\t" << sample.GetNormFactorList().at(k).GetHigh() << std::endl << "\t\t\t\t\t\t\t\t\t]" << std::endl;
+          jsonFile << "\t\t\t\t\t\t\t\]," << std::endl;
+          jsonFile << "\t\t\t\t\t\t\t\"inits\": [" << std::endl;
+          jsonFile << "\t\t\t\t\t\t\t\t" << sample.GetNormFactorList().at(k).GetVal() << std::endl;
+          jsonFile << "\t\t\t\t\t\t\t]," << std::endl;
+          // jsonFile << "\t\t\t\t\t\t\t\t\"name\": \"" << sample.GetNormFactorList().at(k).GetName() << "\"," << std::endl;
+          jsonFile << "\t\t\t\t\t\t\"name\": \"" << sample.GetNormFactorList().at(k).GetName() << "\"" << std::endl;
+          jsonFile << "\t\t\t\t\t}";
+        }
+      }
+    }
+  jsonFile << std::endl << "\t\t\t\t]," << std::endl;
+  // jsonFile << "\t\t\t\t\t}," << std::endl;
+  jsonFile << "\t\t\t\t\"poi\": \"" << fPOI[0]   << "\"" << std::endl;
+  jsonFile << "\t\t\t}," << std::endl << "\t\t\t\"name\": \"" << measurement.GetName() << "\"" << std::endl;
+  jsonFile << "\t\t}" << std::endl << "\t]," << std::endl;
+}
+
+
+
+void RooStats::HistFactory::Measurement::PrintJSON( std::string directory, std::string newOutputPrefix )
+{
+  // First, check that the directory exists:
+  auto testExists = [](const std::string& theDirectory) {
+    void* dir = gSystem->OpenDirectory(theDirectory.c_str());
+    bool exists = dir != nullptr;
+    if (exists)
+      gSystem->FreeDirectory(dir);
+
+    return exists;
+  };
+
+  if ( !directory.empty() && !testExists(directory) ) {
+    int success = gSystem->MakeDirectory(directory.c_str() );
+    if( success != 0 ) {
+      cxcoutEHF << "Error: Failed to make directory: " << directory << std::endl;
+      throw hf_exc();
+    }
+  }
+
+  // If supplied new Prefix, use that one:
+
+  cxcoutPHF << "Printing XML Files for measurement: " << GetName() << std::endl;
+
+  std::string JSONName = std::string(GetName()) + ".json";
+  if( !directory.empty() ) JSONName = directory + "/" + JSONName;
+
+  ofstream json( JSONName.c_str() );
+
+  if ( ! json.is_open() ) {
+    cxcoutEHF << "Error opening json file: " << JSONName << std::endl;
+    throw hf_exc();
+  }
+
+  json << "{" << std::endl;
+  json << "\t\"channels\": [" << std::endl;
+  for (unsigned int i = 0; i < fChannels.size(); ++i) {
+    PrintChannelToJson(json, fChannels.at(i));
+    if (i < fChannels.size() - 1) {
+      json << "," << std::endl;
+    }
+  }
+  json << "\t]," << std::endl;
+  PrintMeasurementToJson(json, *this);
+
+  json << "\t\"observations\": [" << std::endl;
+  for (unsigned int i = 0; i < fChannels.size(); ++i) {
+    PrintObservationToJson(json, fChannels.at(i));
+    if (i < fChannels.size() - 1) {
+      json << "," << std::endl;
+    }
+  }
+  json << "\t]," << std::endl;
+  json << "\t\"version\": \"1.0\"" << std::endl;
+  json << "}" << std::endl;
+
+
+  json.close();
+
+}
 
 /// Create XML files for this measurement in the given directory.
 /// XML files can be configured with a different output prefix

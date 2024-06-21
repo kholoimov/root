@@ -59,7 +59,8 @@ public:
   void AddNormFactor( const NormFactor& Factor );
 
   void AddHistoSys(    std::string Name, std::string HistoNameLow,  std::string HistoFileLow,  std::string HistoPathLow,
-                               std::string HistoNameHigh, std::string HistoFileHigh, std::string HistoPathHigh );
+                               std::string HistoNameHigh, std::string HistoFileHigh, std::string HistoPathHigh,
+                               bool Symmetrize = false, bool NormPlusShape = false);
   void AddHistoSys( const HistoSys& Sys );
 
   void AddHistoFactor( std::string Name, std::string HistoNameLow,  std::string HistoFileLow,  std::string HistoPathLow,
@@ -103,6 +104,12 @@ public:
   /// set name of associated channel
   void SetChannelName(const std::string& ChannelName) { fChannelName = ChannelName; }
 
+  void SetRebinning(bool rebin) { fRebinning = rebin; }
+  bool GetRebinning() const { return fRebinning; }
+
+  TH1* RebinningConfig(TH1* original);
+
+
 
 
   std::vector< RooStats::HistFactory::OverallSys >& GetOverallSysList() { return fOverallSysList; }
@@ -120,7 +127,7 @@ public:
   const std::vector< RooStats::HistFactory::ShapeFactor >& GetShapeFactorList() const { return fShapeFactorList; }
 
 
-  bool HasStatError() const { return fStatErrorActivate; }
+  bool HasStatError() const { return fStatErrorActivate; } // TODO: tell Jonas, that this part of code do nothing :)
   RooStats::HistFactory::StatError& GetStatError() { return fStatError; }
   const RooStats::HistFactory::StatError& GetStatError() const { return fStatError; }
   void SetStatError( RooStats::HistFactory::StatError Error ) {
@@ -156,6 +163,7 @@ protected:
 
   bool fNormalizeByTheory = false;
   bool fStatErrorActivate = false;
+  bool fRebinning = false;
 
 
   /// The Nominal Shape

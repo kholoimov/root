@@ -157,8 +157,6 @@ public:
   void SetName(const char *name) override ;
   void SetNameTitle(const char *name, const char* title) override ;
 
-
-
   void setCovarianceMatrix(TMatrixDSym& V) ;
   void setConstParList(const RooArgList& list) ;
   void setInitParList(const RooArgList& list) ;

@@ -186,6 +186,15 @@ namespace HistFactory {
 class HistoSys final : public HistogramUncertaintyBase {
 public:
   void PrintXML(std::ostream&) const override;
+
+  void SetSymmetrize(bool symmetrize) { fSymmetrize = symmetrize; }
+  const bool GetSymmetrize() const { return fSymmetrize; }
+
+  void SetNormPlusShape(bool normPlusShape) { fNormPlusShape = normPlusShape; }
+  const bool GetNormPlusShape() const { return fNormPlusShape; }
+
+  bool fSymmetrize;
+  bool fNormPlusShape;
 };
 
 /** \class HistoFactor

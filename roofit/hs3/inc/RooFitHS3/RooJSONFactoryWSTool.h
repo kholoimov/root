@@ -132,8 +132,10 @@ public:
    bool importJSON(std::istream &os);
    bool importYML(std::istream &os);
    bool exportJSON(std::string const &fileName);
+   bool exportPYHF(std::string const &fileName);
    bool exportYML(std::string const &fileName);
    bool exportJSON(std::ostream &os);
+   bool exportPYHF(std::ostream &os);
    bool exportYML(std::ostream &os);
 
    std::string exportJSONtoString();

@@ -102,6 +102,16 @@ public:
   void PrintTree( std::ostream& = std::cout ); /// Print to a stream
   void PrintXML( std::string Directory="", std::string NewOutputPrefix="" );
 
+  void PrintJSON( std::string Directory="", std::string NewOutputPrefix="" );
+  void PrintChannelToJson(std::ofstream& jsonFile, RooStats::HistFactory::Channel& channel);
+  void PrintSampleToJson(std::ofstream& jsonFile, RooStats::HistFactory::Sample& sample);
+  void PrintMeasurementToJson(std::ofstream& jsonFile, RooStats::HistFactory::Measurement& measurement);
+  void PrintObservationToJson(std::ofstream& jsonFile, RooStats::HistFactory::Channel& observation);
+  void PrintHistogramToJson(std::ofstream& jsonFile, const TH1* histogram, int indent);
+  void PrintSystematicsToJson(std::ofstream& jsonFile, RooStats::HistFactory::Sample& sample);
+  void PrintStatErrorToJson(std::ofstream& jsonFile, RooStats::HistFactory::Sample& sample);
+  TH1* MakeAbsolUncertaintyHist(const TH1* nominal, std::string name);
+
   std::vector< RooStats::HistFactory::Channel >& GetChannels() { return fChannels; }
   const std::vector< RooStats::HistFactory::Channel >& GetChannels() const { return fChannels; }
   RooStats::HistFactory::Channel& GetChannel( std::string );
@@ -110,6 +120,26 @@ public:
 
   bool HasChannel( std::string );
   void writeToFile( TFile* file );
+
+  void SetRebinningConfig(int rebin, float bin_min, float bin_max)
+  {
+    fHistoBinLow = bin_min;
+    fHistoBinHigh = bin_max;
+    fRebin = rebin;
+  };
+
+  void ApplyRebinning() 
+  {
+    fRebinning = true;
+    for (auto& chan : fChannels)
+    {
+      chan.SetRebinningConfig(fRebin, fHistoBinLow, fHistoBinHigh);
+      chan.ApplyRebinning();
+    }
+  }
+
+  bool IsRebinning() {return fRebinning;}
+
 
   void CollectHistograms();
 
@@ -140,7 +170,14 @@ private:
   double fLumiRelErr;
   int fBinLow;
   int fBinHigh;
+
+  float fHistoBinLow = std::numeric_limits<float>::quiet_NaN();
+  float fHistoBinHigh = std::numeric_limits<float>::quiet_NaN();
+  int fRebin = 1;
+  bool fRebinning = false;
+  
   bool fExportOnly;
+
   std::string fInterpolationScheme;
 
   /// Channels that make up this measurement

@@ -193,6 +193,59 @@ void RooStats::HistFactory::Channel::SetStatErrorConfig( double StatRelErrorThre
 
 }
 
+bool isInteger(float number)
+{
+    return std::abs(number - std::round(number)) < std::numeric_limits<float>::epsilon();
+}
+
+
+TH1* RooStats::HistFactory::Channel::Rebin(TH1* original)
+{
+    if (!fRebinning) return original;
+
+    float left_edge = fHistoBinLow;
+    float right_edge = fHistoBinHigh;
+
+    if (std::isnan(left_edge))
+    {
+      left_edge = original->GetXaxis()->GetXmin();
+    }
+
+    if (std::isnan(right_edge))
+    {
+      right_edge = original->GetXaxis()->GetXmax();
+    }
+    
+    float original_bin_width = (original->GetXaxis()->GetBinWidth(1));
+    int assert_check_left =  ((left_edge - original->GetXaxis()->GetXmin())) / original_bin_width;
+    int assert_check_right = (original->GetXaxis()->GetXmax() - right_edge) / original_bin_width;
+
+    std::cout << "fHistBinLow: " << left_edge << std::endl;
+    std::cout << "fHistBinHigh: " << right_edge << std::endl;
+    std::cout << "original_bin_width: " << original_bin_width << std::endl;
+
+    if (!isInteger(assert_check_left) || !isInteger(assert_check_right))
+    {
+        std::cout << "Error: The left_edge and right_edge are not multiples of the original bin width" << std::endl;
+        return original;
+    }
+
+    int number_of_remove_bins = ((left_edge - original->GetXaxis()->GetXmin()) + (original->GetXaxis()->GetXmax() - right_edge)) / original_bin_width;
+    std::cout << "number of remove bins: " << number_of_remove_bins << std::endl;
+    int new_nbins = (original->GetNbinsX() - number_of_remove_bins) / fRebin;
+    std::cout << "new_nbins: " << new_nbins << std::endl;
+    TH1F* original_new = new TH1F(original->GetName(), original->GetTitle(), new_nbins, left_edge, right_edge);
+    int skipped_bins_left = (left_edge - original->GetXaxis()->GetXmin()) / original_bin_width;
+    for (int i = 1; i <= new_nbins; ++i)
+    {
+        int bin = i + skipped_bins_left;
+        original_new->SetBinContent(i, original->GetBinContent(bin));
+        original_new->SetBinError(i, original->GetBinError(bin));
+    }
+
+    return original_new;
+}
+
 
 
 void RooStats::HistFactory::Channel::CollectHistograms() {
@@ -206,16 +259,17 @@ void RooStats::HistFactory::Channel::CollectHistograms() {
   // Get the Data Histogram:
 
   if( !fData.GetInputFile().empty() ) {
-    fData.SetHisto( GetHistogram(fData.GetInputFile(),
+    fData.SetHisto( Rebin(GetHistogram(fData.GetInputFile(),
              fData.GetHistoPath(),
              fData.GetHistoName(),
-             fileHandles) );
+             fileHandles) ));
   }
+
 
   // Collect any histograms for additional Datasets
   for(auto& data : fAdditionalData) {
     if( !data.GetInputFile().empty() ) {
-      data.SetHisto( GetHistogram(data.GetInputFile(), data.GetHistoPath(), data.GetHistoName(), fileHandles) );
+      data.SetHisto( Rebin(GetHistogram(data.GetInputFile(), data.GetHistoPath(), data.GetHistoName(), fileHandles) ));
     }
   }
 
@@ -227,37 +281,178 @@ void RooStats::HistFactory::Channel::CollectHistograms() {
 
     // Get the nominal histogram:
     cxcoutDHF << "Collecting Nominal Histogram" << std::endl;
-    TH1* Nominal =  GetHistogram(sample.GetInputFile(),
+    TH1* Nominal =  Rebin(GetHistogram(sample.GetInputFile(),
              sample.GetHistoPath(),
              sample.GetHistoName(),
-             fileHandles);
+             fileHandles));
 
     sample.SetHisto( Nominal );
 
+    // printf("number of histoSys: %d\n", sample.GetHistoSysList().size());
+    
+    for( unsigned int histoSysItr = 0; histoSysItr < sample.GetHistoSysList().size(); ++histoSysItr ) {
+          RooStats::HistFactory::HistoSys& histoSys = sample.GetHistoSysList().at( histoSysItr );
+            if (histoSys.GetSymmetrize())
+            {
+
+              
+              // TODO: implement calculation of symmetrized histogram
+              if (!histoSys.GetNormPlusShape())
+              {
+                TFile* file = TFile::Open(histoSys.GetInputFileHigh().c_str(), "UPDATE");
+                TH1* h_top = Rebin(GetHistogram(histoSys.GetInputFileHigh(),
+                  histoSys.GetHistoPathHigh(),
+                  histoSys.GetHistoNameHigh(),
+                  fileHandles));
+
+                TH1* histNominal = Rebin(GetHistogram(sample.GetInputFile(),
+                  sample.GetHistoPath(),
+                  sample.GetHistoName(),
+                  fileHandles));
+
+                auto* h_new = (TH1*)h_top->Clone();
+                h_new->Add(histNominal, -1);
+                TH1* h_temp = (TH1*)histNominal->Clone(histoSys.GetHistoNameLow().c_str());
+                // h_temp->SetName(histoSys.GetHistoNameLow().c_str());
+                h_temp->Add(h_new, -1);
+                file->cd(histoSys.GetHistoPathLow().c_str());
+                bool write_histogram = true;
+                if (write_histogram)  h_temp->Write();
+                // printf("Setting histogram\n");
+                histoSys.SetHistoLow(h_temp);
+                // printf("Set histogram\n");
+
+                file->Close();
+              }
+              else
+              {
+                TFile* file = TFile::Open(histoSys.GetInputFileHigh().c_str(), "UPDATE");
+                TH1* h_top = Rebin(GetHistogram(histoSys.GetInputFileHigh(),
+                  histoSys.GetHistoPathHigh(),
+                  histoSys.GetHistoNameHigh(),
+                  fileHandles));
+
+                TH1* histNominal = Rebin(GetHistogram(sample.GetInputFile(),
+                  sample.GetHistoPath(),
+                  sample.GetHistoName(),
+                  fileHandles));
+
+                double norm_factor = h_top->Integral()/histNominal->Integral();
+
+                auto* h_new = (TH1*)h_top->Clone(histoSys.GetHistoNameHigh().c_str());
+                h_new->Scale(1 / norm_factor);
+
+                // h_new->Add(histNominal, -1);
+                TH1* h_temp = (TH1*)histNominal->Clone(histoSys.GetHistoNameLow().c_str());
+                // h_temp->SetName(histoSys.GetHistoNameLow().c_str());
+                h_temp->Scale(2);
+                h_temp->Add(h_new, -1);
+                // h_new->Scale(norm_factor*norm_factor);
+                // double lo_scale = 2 - norm_factor;
+                // h_temp->Scale(lo_scale);
+                file->cd(histoSys.GetHistoPathLow().c_str());
+
+                // trying to remove histogram
+                auto* h1 = (TH1*)file->Get(histoSys.GetHistoNameLow().c_str());
+                if (h1) h1->SetDirectory(nullptr);
+                auto* h2 = (TH1*)file->Get(histoSys.GetHistoNameHigh().c_str());
+                if (h2) h2->SetDirectory(nullptr);
+
+                bool write_histogram = true;
+                if (write_histogram)  
+                  {
+                    h_temp->Write();
+                    h_new->Write();
+                  }
+                // printf("Setting histogram\n");
+                histoSys.SetHistoLow(h_temp);
+                histoSys.SetHistoHigh(h_new);
+                // printf("Set histogram\n");
+
+                // histoSys.Set
+
+                RooStats::HistFactory::OverallSys sys;
+                sys.SetName(histoSys.GetName());
+                double sys_low = 2 - norm_factor;
+                double sys_high = norm_factor;
+                sys.SetLow(sys_low);
+                sys.SetHigh(sys_high);
+                sample.GetOverallSysList().push_back(sys);
+
+
+                file->Close();
+              }
+            }
+    }
 
     // Get the StatError Histogram (if necessary)
     if( sample.GetStatError().GetUseHisto() ) {
-      sample.GetStatError().SetErrorHist( GetHistogram(sample.GetStatError().GetInputFile(),
+      sample.GetStatError().SetErrorHist( Rebin(GetHistogram(sample.GetStatError().GetInputFile(),
                          sample.GetStatError().GetHistoPath(),
                          sample.GetStatError().GetHistoName(),
-                         fileHandles) );
+                         fileHandles) ));
     }
 
+    printf("number of histoSys: %d\n", sample.GetHistoSysList().size());
 
     // Get the HistoSys Variations:
-    for( unsigned int histoSysItr = 0; histoSysItr < sample.GetHistoSysList().size(); ++histoSysItr ) {
-
+    for( unsigned int histoSysItr = 0; histoSysItr < sample.GetHistoSysList().size(); ++histoSysItr ) 
+    {
       RooStats::HistFactory::HistoSys& histoSys = sample.GetHistoSysList().at( histoSysItr );
 
-      histoSys.SetHistoLow( GetHistogram(histoSys.GetInputFileLow(),
-                histoSys.GetHistoPathLow(),
-                histoSys.GetHistoNameLow(),
-                fileHandles) );
+      if (!histoSys.GetSymmetrize())
+      {
+        histoSys.SetHistoLow( Rebin(GetHistogram(histoSys.GetInputFileLow(),
+                  histoSys.GetHistoPathLow(),
+                  histoSys.GetHistoNameLow(),
+                  fileHandles) ));
+      // }
 
-      histoSys.SetHistoHigh( GetHistogram(histoSys.GetInputFileHigh(),
-                 histoSys.GetHistoPathHigh(),
-                 histoSys.GetHistoNameHigh(),
-                 fileHandles) );
+        histoSys.SetHistoHigh( Rebin(GetHistogram(histoSys.GetInputFileHigh(),
+                  histoSys.GetHistoPathHigh(),
+                  histoSys.GetHistoNameHigh(),
+                  fileHandles) ));
+      }
+
+      if (histoSys.GetNormPlusShape() and (!histoSys.GetSymmetrize()))
+      {
+        RooStats::HistFactory::OverallSys sys;
+        sys.SetName(histoSys.GetName());
+        double sys_low = histoSys.GetHistoLow()->Integral()/sample.GetHisto()->Integral();
+        double sys_high = histoSys.GetHistoHigh()->Integral()/sample.GetHisto()->Integral();
+        // double sys_high = 2 - sys_low;
+        sys.SetLow(sys_low);
+        sys.SetHigh(sys_high);
+        sample.GetOverallSysList().push_back(sys);
+
+        TFile* file = TFile::Open(histoSys.GetInputFileHigh().c_str(), "UPDATE");
+
+        file->cd(histoSys.GetHistoPathLow().c_str()); // TODO: do this for both of files
+
+        auto* histo_new_high = (TH1*)histoSys.GetHistoHigh()->Clone(histoSys.GetHistoNameHigh().c_str());
+        histo_new_high->Scale(1 / sys_high);
+        histoSys.SetHistoHigh(histo_new_high);
+
+
+        auto* histo_new_low = (TH1*)histoSys.GetHistoLow()->Clone(histoSys.GetHistoNameLow().c_str());
+        histo_new_low->Scale(1 / sys_low);
+        histoSys.SetHistoLow(histo_new_low);
+
+        bool write_histogram = true;
+        if (write_histogram)  
+        {
+          histo_new_high->Write();
+          histo_new_low->Write();
+        }
+
+
+        file->Close();
+
+        // std::string shape_name = "Test_name";
+        // RooStats::HistFactory::ShapeFactor factor;
+        // factor.SetName(shape_name);
+        // sample.GetShapeFactorList().push_back(factor);
+      }
     } // End Loop over HistoSys
 
 
@@ -266,15 +461,15 @@ void RooStats::HistFactory::Channel::CollectHistograms() {
 
       RooStats::HistFactory::HistoFactor& histoFactor = sample.GetHistoFactorList().at( histoFactorItr );
 
-      histoFactor.SetHistoLow( GetHistogram(histoFactor.GetInputFileLow(),
+      histoFactor.SetHistoLow( Rebin(GetHistogram(histoFactor.GetInputFileLow(),
                    histoFactor.GetHistoPathLow(),
                    histoFactor.GetHistoNameLow(),
-                   fileHandles) );
+                   fileHandles) ));
 
-      histoFactor.SetHistoHigh( GetHistogram(histoFactor.GetInputFileHigh(),
+      histoFactor.SetHistoHigh( Rebin(GetHistogram(histoFactor.GetInputFileHigh(),
                     histoFactor.GetHistoPathHigh(),
                     histoFactor.GetHistoNameHigh(),
-                    fileHandles) );
+                    fileHandles) ));
     } // End Loop over HistoFactor
 
 
@@ -283,10 +478,10 @@ void RooStats::HistFactory::Channel::CollectHistograms() {
 
       RooStats::HistFactory::ShapeSys& shapeSys = sample.GetShapeSysList().at( shapeSysItr );
 
-      shapeSys.SetErrorHist( GetHistogram(shapeSys.GetInputFile(),
+      shapeSys.SetErrorHist( Rebin(GetHistogram(shapeSys.GetInputFile(),
                  shapeSys.GetHistoPath(),
                  shapeSys.GetHistoName(),
-                 fileHandles) );
+                 fileHandles) ));
     } // End Loop over ShapeSys
 
 
@@ -297,8 +492,8 @@ void RooStats::HistFactory::Channel::CollectHistograms() {
 
       // Check if we need an InitialShape
       if( shapeFactor.HasInitialShape() ) {
-   TH1* hist = GetHistogram( shapeFactor.GetInputFile(), shapeFactor.GetHistoPath(),
-              shapeFactor.GetHistoName(), fileHandles );
+   TH1* hist = Rebin(GetHistogram( shapeFactor.GetInputFile(), shapeFactor.GetHistoPath(),
+              shapeFactor.GetHistoName(), fileHandles ));
    shapeFactor.SetInitialShape( hist );
       }
 
@@ -365,18 +560,37 @@ bool RooStats::HistFactory::Channel::CheckHistograms() const {
       // Get the HistoSys Variations:
       for( unsigned int histoSysItr = 0; histoSysItr < sample.GetHistoSysList().size(); ++histoSysItr ) {
 
-   const RooStats::HistFactory::HistoSys& histoSys = sample.GetHistoSysList().at( histoSysItr );
+        const RooStats::HistFactory::HistoSys& histoSys = sample.GetHistoSysList().at( histoSysItr );
 
-   if( histoSys.GetHistoLow() == nullptr ) {
-     cxcoutEHF << "Error: HistoSyst Low for Systematic " << histoSys.GetName()
-          << " in sample " << sample.GetName() << " is nullptr." << std::endl;
-     return false;
-   }
-   if( histoSys.GetHistoHigh() == nullptr ) {
-     cxcoutEHF << "Error: HistoSyst High for Systematic " << histoSys.GetName()
-          << " in sample " << sample.GetName() << " is nullptr." << std::endl;
-     return false;
-   }
+          // if (histoSys.GetSymmetrize())
+          // {
+          //   // TODO: implement calculation of symmetrized histogram
+
+          //   TFile* file = TFile::Open(histoSys.GetInputFileHigh().c_str(), "UPDATE");
+            
+          //   TH1* h_top = dynamic_cast<TH1*>(file->Get((histoSys.GetHistoPathHigh()+ "/" + histoSys.GetHistoNameHigh()).c_str()));
+          //   const TH1* histNominal = sample.GetHisto();
+          //   auto* h_new = (TH1*)h_top->Clone();
+          //   h_new->Add(histNominal, -1);
+          //   auto* h_temp = (TH1*)histNominal->Clone(histoSys.GetHistoNameLow().c_str());
+          //   h_temp->Add(h_new, -1);
+
+          //   file->cd(histoSys.GetHistoPathLow().c_str());
+          //   h_temp->Write();
+
+          //   file->Close();
+          // }
+
+        if( histoSys.GetHistoLow() == nullptr ) {
+          cxcoutEHF << "Error: HistoSyst Low for Systematic " << histoSys.GetName()
+                << " in sample " << sample.GetName() << " is nullptr." << std::endl;
+          return false;
+        }
+        if( histoSys.GetHistoHigh() == nullptr ) {
+          cxcoutEHF << "Error: HistoSyst High for Systematic " << histoSys.GetName()
+                << " in sample " << sample.GetName() << " is nullptr." << std::endl;
+          return false;
+        }
 
       } // End Loop over HistoSys
 

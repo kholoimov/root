@@ -82,6 +82,16 @@ public:
   void CollectHistograms();
   bool CheckHistograms() const;
 
+  TH1* Rebin(TH1* original);
+  void SetRebinningConfig(int rebin, float bin_min, float bin_max) {
+    fRebin = rebin;
+    fHistoBinLow = bin_min;
+    fHistoBinHigh = bin_max;
+  }
+
+  void ApplyRebinning() {fRebinning = true;}
+  bool IsRebinning() {return fRebinning;}
+
 protected:
 
   std::string fName;
@@ -89,6 +99,11 @@ protected:
   std::string fHistoPath;
 
   HistFactory::Data fData;
+
+  float fHistoBinLow = std::numeric_limits<float>::quiet_NaN();
+  float fHistoBinHigh = std::numeric_limits<float>::quiet_NaN();
+  int fRebin = 1;
+  bool fRebinning = false;
 
   /// One can add additional datasets
   /// These are simply added to the xml under a different name

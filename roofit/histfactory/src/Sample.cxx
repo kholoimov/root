@@ -14,6 +14,7 @@
  */
 
 #include "TH1.h"
+#include "TFile.h"
 #include "RooStats/HistFactory/Sample.h"
 #include "RooStats/HistFactory/HistFactoryException.h"
 
@@ -304,6 +305,7 @@ void RooStats::HistFactory::Sample::PrintXML( std::ofstream& xml ) const {
 
 void RooStats::HistFactory::Sample::ActivateStatError() {
 
+  fStatErrorActivate = true;
   fStatError.Activate( true );
   fStatError.SetUseHisto( false );
 
@@ -313,6 +315,7 @@ void RooStats::HistFactory::Sample::ActivateStatError() {
 void RooStats::HistFactory::Sample::ActivateStatError( std::string StatHistoName, std::string StatInputFile, std::string StatHistoPath ) {
 
 
+  fStatErrorActivate = true;
   fStatError.Activate( true );
   fStatError.SetUseHisto( true );
 
@@ -358,18 +361,25 @@ void RooStats::HistFactory::Sample::AddNormFactor( const NormFactor& Factor ) {
 
 void RooStats::HistFactory::Sample::AddHistoSys( std::string SysName,
 std::string SysHistoNameLow,  std::string SysHistoFileLow,  std::string SysHistoPathLow,
-                   std::string SysHistoNameHigh, std::string SysHistoFileHigh, std::string SysHistoPathHigh ) {
+                   std::string SysHistoNameHigh, std::string SysHistoFileHigh, std::string SysHistoPathHigh, 
+                   bool Symmetrize, bool NormPlusShape) {
 
   RooStats::HistFactory::HistoSys sys;
   sys.SetName( SysName );
+
+  sys.SetHistoNameHigh( SysHistoNameHigh );
+  sys.SetHistoPathHigh( SysHistoPathHigh );
+  sys.SetInputFileHigh( SysHistoFileHigh );
 
   sys.SetHistoNameLow( SysHistoNameLow );
   sys.SetHistoPathLow( SysHistoPathLow );
   sys.SetInputFileLow( SysHistoFileLow );
 
-  sys.SetHistoNameHigh( SysHistoNameHigh );
-  sys.SetHistoPathHigh( SysHistoPathHigh );
-  sys.SetInputFileHigh( SysHistoFileHigh );
+  sys.SetSymmetrize(Symmetrize);
+
+  sys.SetNormPlusShape(NormPlusShape);
+
+  printf("Control options = %i\n", NormPlusShape);
 
   fHistoSysList.push_back( sys );
 

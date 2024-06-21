@@ -1969,6 +1969,27 @@ bool RooJSONFactoryWSTool::exportJSON(std::string const &filename)
    return this->exportJSON(out);
 }
 
+bool RooJSONFactoryWSTool::exportPYHF(std::ostream &os)
+{
+   std::unique_ptr<JSONTree> tree = createNewJSONTree();
+   JSONNode &n = tree->rootnode();
+   this->exportAllObjects(n);
+   n.writeJSON(os);
+   return true;
+}
+
+bool RooJSONFactoryWSTool::exportPYHF(std::string const &filename)
+{
+   std::ofstream out(filename.c_str());
+   if (!out.is_open()) {
+      std::stringstream ss;
+      ss << "RooJSONFactoryWSTool() invalid output file '" << filename << "'." << std::endl;
+      RooJSONFactoryWSTool::error(ss.str());
+      return false;
+   }
+   return this->exportPYHF(out);
+}
+
 /**
  * @brief Export the workspace to YML format and write to the output stream.
  *

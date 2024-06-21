@@ -42,6 +42,7 @@ ROOT_STANDARD_LIBRARY_PACKAGE(HistFactory
     RooStats/HistFactory/PreprocessFunction.h
     RooStats/HistFactory/RooBarlowBeestonLL.h
     RooStats/HistFactory/Sample.h
+    RooStats/HistFactory/HistFactoryFromJson.h
     RooStats/HistFactory/Systematics.h
     ${HISTFACTORY_XML_HEADERS}
   SOURCES
@@ -63,6 +64,7 @@ ROOT_STANDARD_LIBRARY_PACKAGE(HistFactory
     src/PreprocessFunction.cxx
     src/RooBarlowBeestonLL.cxx
     src/Sample.cxx
+    src/HistFactoryFromJson.cxx
     src/Systematics.cxx
     ${HISTFACTORY_XML_SOURCES}
   DICTIONARY_OPTIONS
