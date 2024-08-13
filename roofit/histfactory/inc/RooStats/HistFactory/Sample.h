@@ -50,7 +50,7 @@ public:
   // This has to be given separately
 
   void ActivateStatError();
-  void ActivateStatError( std::string HistoName, std::string InputFile, std::string HistoPath="" );
+  void ActivateStatError( std::string HistoName, std::string InputFile = "", std::string HistoPath="" );
 
   void AddOverallSys( std::string Name, double Low, double High );
   void AddOverallSys( const OverallSys& Sys );
@@ -69,7 +69,7 @@ public:
   void AddShapeFactor( std::string Name );
   void AddShapeFactor( const ShapeFactor& Factor );
 
-  void AddShapeSys(    std::string Name, Constraint::Type ConstraintType, std::string HistoName, std::string HistoFile, std::string HistoPath="" );
+  void AddShapeSys(    std::string Name, Constraint::Type ConstraintType, std::string HistoName, std::string HistoFile = "", std::string HistoPath="" );
   void AddShapeSys( const ShapeSys& Sys );
 
   /// defines whether the normalization scale with luminosity
