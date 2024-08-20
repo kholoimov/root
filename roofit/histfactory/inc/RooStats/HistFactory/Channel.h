@@ -58,6 +58,10 @@ public:
   RooStats::HistFactory::Data& GetData() { return fData; }
   const RooStats::HistFactory::Data& GetData() const { return fData; }
 
+  /// set overall systematic for all samples in channel
+  void SetGlobalOverallSys( std::string Name, double Low, double High );
+  void SetGlobalOverallSys( const OverallSys& Sys );
+
   /// add additional data object
   void AddAdditionalData( const RooStats::HistFactory::Data& data ) { fAdditionalData.push_back(data); }
   /// retrieve vector of additional data objects
@@ -95,6 +99,8 @@ protected:
   std::vector<RooStats::HistFactory::Data> fAdditionalData;
 
   HistFactory::StatErrorConfig fStatErrorConfig;
+
+  std::vector< RooStats::HistFactory::OverallSys >  fGlobalOverallSysList;
 
   std::vector< RooStats::HistFactory::Sample > fSamples;
 

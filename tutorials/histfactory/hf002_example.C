@@ -38,7 +38,6 @@ void hf002_example() {
 
   meas.SetOutputFilePrefix( "./results/example_UsingC" );
   meas.SetPOI( "SigXsecOverSM" );
-  meas.AddConstantParam("alpha_syst1");
   meas.AddConstantParam("Lumi");
 
   meas.SetLumi( 1.0 );
@@ -51,6 +50,7 @@ void hf002_example() {
   Channel chan( "channel1" );
   chan.SetData( "data", InputFile );
   chan.SetStatErrorConfig( 0.05, "Poisson" );
+  chan.SetGlobalOverallSys("syst1", 0.95, 1.05);
 
 
   // Now, create some samples
@@ -58,21 +58,20 @@ void hf002_example() {
 
   // Create the signal sample
   Sample signal( "signal", "signal", InputFile );
-  signal.AddOverallSys( "syst1",  0.95, 1.05 );
   signal.ActivateStatError();
-  signal.AddNormFactor( "SigXsecOverSM", 1, 0, 3 );
+  signal.AddNormFactor("SigXsecOverSM", 1, 0, 3 );
   chan.AddSample( signal );
 
   // Background 1
-  Sample background1( "background1", "background1", InputFile );
+  Sample background1("background1", "background1", InputFile );
+  // Input file name can be skipped, in such case same input file as for nominal histogram will be used
   background1.AddHistoSys("weighted_modeling",
                             "weighted_modeling_up", "", "",
                               "weighted_modeling_down", "", "");
   background1.AddHistoSys("modeling",
-                            "modeling_up", "", "",
+                            "modeling_up", "", "", 
                               "modeling_down", "", "");
   background1.ActivateStatError();
-  background1.AddOverallSys( "syst2", 0.95, 1.05  );
   chan.AddSample( background1 );
 
 
@@ -82,17 +81,9 @@ void hf002_example() {
   meas.AddChannel( chan );
 
   // Collect the histograms from their files,
-  // print some output,
   meas.CollectHistograms();
-  meas.PrintTree();
 
-  // One can print XML code to an
-  // output directory:
-  // meas.PrintXML( "xmlFromCCode", meas.GetOutputFilePrefix() );
-
-  // Now, do the measurement
-  MakeModelAndMeasurementFast( meas );
-
+  // Now, do the measurement and create RooWorkspace
   std::unique_ptr<RooWorkspace> ws{MakeModelAndMeasurementFast(meas)};
 
   RooStats::ModelConfig *modelConfig = static_cast<RooStats::ModelConfig*>(ws->obj("ModelConfig"));
@@ -100,10 +91,21 @@ void hf002_example() {
   RooAbsPdf *pdf = modelConfig->GetPdf();
   RooArgSet globalObservables{*modelConfig->GetGlobalObservables()};
 
+  // Perform the fit
   using namespace RooFit;
   std::unique_ptr<RooFitResult> result{
       pdf->fitTo(*ws->data("obsData"), Save(), PrintLevel(-1), GlobalObservables(globalObservables))
   };
 
   result->Print();
+
+  bool saveFitResults = true;
+
+  if (saveFitResults)
+  {
+    std::unique_ptr<TFile> file = std::make_unique<TFile>("fitResults.root", "RECREATE");
+    result->Write("fitResult");
+    file->Close();
+  }
+
 }

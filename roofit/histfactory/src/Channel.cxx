@@ -49,6 +49,12 @@ namespace RooStats{
 
 void RooStats::HistFactory::Channel::AddSample( RooStats::HistFactory::Sample sample )
 {
+  // add all systematics from channel global systematics list
+  for (auto& Sys : fGlobalOverallSysList)
+  {
+    sample.GetOverallSysList().push_back(Sys);
+  }
+
   // add fully configured sample to channel
 
   sample.SetChannelName( GetName() );
@@ -152,6 +158,19 @@ void RooStats::HistFactory::Channel::SetData( std::string DataHistoName, std::st
 
 }
 
+void RooStats::HistFactory::Channel::SetGlobalOverallSys( std::string SysName, double SysLow, double SysHigh ) {
+
+  RooStats::HistFactory::OverallSys sys;
+  sys.SetName( SysName );
+  sys.SetLow( SysLow );
+  sys.SetHigh( SysHigh );
+
+  fGlobalOverallSysList.push_back( sys );
+}
+
+void RooStats::HistFactory::Channel::SetGlobalOverallSys( const OverallSys& Sys ) {
+  fGlobalOverallSysList.push_back(Sys);
+}
 
 
 void RooStats::HistFactory::Channel::SetData( TH1* hData ) {
