@@ -41,7 +41,7 @@ void hf002_example() {
   meas.AddConstantParam("Lumi");
 
   meas.SetLumi( 1.0 );
-  meas.SetLumiRelErr( 0.10 );
+  meas.SetLumiRelErr( 0.0 );
   meas.SetExportOnly( false );
   meas.SetBinHigh( 2 );
 
@@ -109,3 +109,4 @@ void hf002_example() {
   }
 
 }
+
