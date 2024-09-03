@@ -316,6 +316,8 @@ void RooStats::HistFactory::Sample::ActivateStatError( std::string StatHistoName
   fStatError.Activate( true );
   fStatError.SetUseHisto( true );
 
+  if (StatInputFile == "") {StatInputFile = fInputFile;}
+
   fStatError.SetInputFile( StatInputFile );
   fStatError.SetHistoName( StatHistoName );
   fStatError.SetHistoPath( StatHistoPath );
@@ -360,6 +362,9 @@ void RooStats::HistFactory::Sample::AddHistoSys( std::string SysName,
 std::string SysHistoNameLow,  std::string SysHistoFileLow,  std::string SysHistoPathLow,
                    std::string SysHistoNameHigh, std::string SysHistoFileHigh, std::string SysHistoPathHigh ) {
 
+  if (SysHistoFileLow == "") {SysHistoFileLow = fInputFile;}
+  if (SysHistoFileHigh == "") {SysHistoFileHigh = fInputFile;}
+
   RooStats::HistFactory::HistoSys sys;
   sys.SetName( SysName );
 
@@ -385,6 +390,9 @@ void RooStats::HistFactory::Sample::AddHistoFactor( std::string SysName, std::st
 
   RooStats::HistFactory::HistoFactor factor;
   factor.SetName( SysName );
+
+  if (SysHistoFileLow == "") {SysHistoFileLow = fInputFile;}
+  if (SysHistoFileHigh == "") {SysHistoFileHigh = fInputFile;}
 
   factor.SetHistoNameLow( SysHistoNameLow );
   factor.SetHistoPathLow( SysHistoPathLow );
@@ -422,6 +430,8 @@ void RooStats::HistFactory::Sample::AddShapeSys( std::string SysName, Constraint
   RooStats::HistFactory::ShapeSys sys;
   sys.SetName( SysName );
   sys.SetConstraintType( SysConstraintType );
+
+  if (SysHistoFile == "") {SysHistoFile = fInputFile;}
 
   sys.SetHistoName( SysHistoName );
   sys.SetHistoPath( SysHistoPath );
